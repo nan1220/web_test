@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'react-konva'
 
 const MIN_STAGE_HEIGHT = 560
 const MAX_STAGE_HEIGHT = 840
-const MIN_ITEM_SIZE = 80
 
 function createId(prefix = 'item') {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -45,9 +45,21 @@ function createArt(title, from, to, accent) {
 }
 
 const SAMPLE_IMAGES = [
-  { id: 'orbit', label: 'Orbit', src: createArt('Orbit', '#f97316', '#fbbf24', '#7c2d12') },
-  { id: 'aurora', label: 'Aurora', src: createArt('Aurora', '#2563eb', '#7c3aed', '#db2777') },
-  { id: 'desert', label: 'Desert', src: createArt('Desert', '#0f766e', '#f59e0b', '#065f46') },
+  {
+    id: 'orbit',
+    label: 'Orbit',
+    src: createArt('Orbit', '#f97316', '#fbbf24', '#7c2d12'),
+  },
+  {
+    id: 'aurora',
+    label: 'Aurora',
+    src: createArt('Aurora', '#2563eb', '#7c3aed', '#db2777'),
+  },
+  {
+    id: 'desert',
+    label: 'Desert',
+    src: createArt('Desert', '#0f766e', '#f59e0b', '#065f46'),
+  },
 ]
 
 const INITIAL_ITEMS = [
@@ -62,12 +74,83 @@ const INITIAL_ITEMS = [
   },
 ]
 
+function PictureNode({ item, isSelected, onSelect, onUpdate, onTransformEnd, registerNode }) {
+  const shapeRef = useRef(null)
+  const [image, setImage] = useState(null)
+
+  useEffect(() => {
+    registerNode(item.id, shapeRef.current)
+
+    return () => registerNode(item.id, null)
+  }, [item.id, registerNode])
+
+  useEffect(() => {
+    let isActive = true
+    const loadedImage = new window.Image()
+    loadedImage.onload = () => {
+      if (isActive) {
+        setImage(loadedImage)
+      }
+    }
+    loadedImage.src = item.src
+
+    return () => {
+      isActive = false
+    }
+  }, [item.src])
+
+  return (
+    <>
+      {image && (
+        <KonvaImage
+          ref={shapeRef}
+          image={image}
+          x={item.x}
+          y={item.y}
+          width={item.width}
+          height={item.height}
+          draggable
+          onClick={() => onSelect(item.id)}
+          onTap={() => onSelect(item.id)}
+          onDragStart={() => onSelect(item.id)}
+          onDragEnd={(event) => {
+            onUpdate(item.id, {
+              x: event.target.x(),
+              y: event.target.y(),
+            })
+          }}
+          onTransformStart={() => onSelect(item.id)}
+          onTransformEnd={() => onTransformEnd(item.id)}
+          shadowColor="rgba(0, 0, 0, 0.3)"
+          shadowBlur={20}
+          shadowOffset={{ x: 0, y: 12 }}
+          shadowOpacity={0.25}
+          cornerRadius={24}
+        />
+      )}
+
+      {isSelected && image && (
+        <Rect
+          x={item.x}
+          y={item.y}
+          width={item.width}
+          height={item.height}
+          stroke="#ffffff"
+          strokeWidth={2}
+          dash={[8, 6]}
+          listening={false}
+        />
+      )}
+    </>
+  )
+}
+
 function App() {
   const stageHostRef = useRef(null)
-  const canvasRef = useRef(null)
+  const stageRef = useRef(null)
+  const transformerRef = useRef(null)
   const fileInputRef = useRef(null)
-  const interactionRef = useRef(null)
-  const imageCacheRef = useRef({})
+  const nodeRefs = useRef({})
 
   const [stageSize, setStageSize] = useState({ width: 960, height: 640 })
   const [items, setItems] = useState(INITIAL_ITEMS)
@@ -75,12 +158,52 @@ function App() {
   const [isDropActive, setIsDropActive] = useState(false)
   const [message, setMessage] = useState('Drop images onto the canvas or drag in a starter picture.')
 
-  const stageHeight = clamp(Math.round(stageSize.width * 0.7), MIN_STAGE_HEIGHT, MAX_STAGE_HEIGHT)
+  const stageHeight = useMemo(() => {
+    return clamp(Math.round(stageSize.width * 0.7), MIN_STAGE_HEIGHT, MAX_STAGE_HEIGHT)
+  }, [stageSize.width])
 
-  const updateItem = useCallback((id, patch) => {
-    setItems((currentItems) =>
-      currentItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
-    )
+  useEffect(() => {
+    const host = stageHostRef.current
+    if (!host) {
+      return undefined
+    }
+
+    const updateSize = () => {
+      const width = Math.max(320, Math.floor(host.clientWidth))
+      setStageSize({ width, height: clamp(Math.round(width * 0.7), MIN_STAGE_HEIGHT, MAX_STAGE_HEIGHT) })
+    }
+
+    updateSize()
+
+    const resizeObserver = new ResizeObserver(updateSize)
+    resizeObserver.observe(host)
+
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  useEffect(() => {
+    const transformer = transformerRef.current
+    const selectedNode = nodeRefs.current[selectedId]
+
+    if (!transformer) {
+      return
+    }
+
+    if (selectedNode) {
+      transformer.nodes([selectedNode])
+      transformer.getLayer()?.batchDraw()
+    } else {
+      transformer.nodes([])
+      transformer.getLayer()?.batchDraw()
+    }
+  }, [items, selectedId])
+
+  const registerNode = useCallback((id, node) => {
+    if (node) {
+      nodeRefs.current[id] = node
+    } else {
+      delete nodeRefs.current[id]
+    }
   }, [])
 
   const bringToFront = useCallback((id) => {
@@ -92,6 +215,12 @@ function App() {
 
       return [...currentItems.filter((item) => item.id !== id), target]
     })
+  }, [])
+
+  const updateItem = useCallback((id, patch) => {
+    setItems((currentItems) =>
+      currentItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    )
   }, [])
 
   const addItem = useCallback(
@@ -115,149 +244,6 @@ function App() {
     [bringToFront, stageHeight, stageSize.width],
   )
 
-  const setImageForId = useCallback((id, src) => {
-    if (imageCacheRef.current[id]) {
-      return imageCacheRef.current[id]
-    }
-
-    const image = new window.Image()
-    image.src = src
-    imageCacheRef.current[id] = image
-    return image
-  }, [])
-
-  useEffect(() => {
-    const host = stageHostRef.current
-    if (!host) {
-      return undefined
-    }
-
-    const updateSize = () => {
-      const width = Math.max(320, Math.floor(host.clientWidth))
-      const height = clamp(Math.round(width * 0.7), MIN_STAGE_HEIGHT, MAX_STAGE_HEIGHT)
-      setStageSize({ width, height })
-    }
-
-    updateSize()
-
-    const resizeObserver = new ResizeObserver(updateSize)
-    resizeObserver.observe(host)
-
-    return () => resizeObserver.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) {
-      return
-    }
-
-    canvas.width = stageSize.width
-    canvas.height = stageHeight
-
-    const context = canvas.getContext('2d')
-    if (!context) {
-      return
-    }
-
-    context.clearRect(0, 0, canvas.width, canvas.height)
-
-    const gradient = context.createLinearGradient(0, 0, canvas.width, canvas.height)
-    gradient.addColorStop(0, '#0f172a')
-    gradient.addColorStop(1, '#111827')
-    context.fillStyle = gradient
-    context.fillRect(0, 0, canvas.width, canvas.height)
-
-    context.strokeStyle = 'rgba(255, 255, 255, 0.06)'
-    context.lineWidth = 1
-
-    for (let x = 0; x <= canvas.width; x += 80) {
-      context.beginPath()
-      context.moveTo(x, 0)
-      context.lineTo(x, canvas.height)
-      context.stroke()
-    }
-
-    for (let y = 0; y <= canvas.height; y += 80) {
-      context.beginPath()
-      context.moveTo(0, y)
-      context.lineTo(canvas.width, y)
-      context.stroke()
-    }
-  }, [stageHeight, stageSize.height, stageSize.width])
-
-  useEffect(() => {
-    const onPointerMove = (event) => {
-      const interaction = interactionRef.current
-      if (!interaction) {
-        return
-      }
-
-      const host = stageHostRef.current
-      if (!host) {
-        return
-      }
-
-      const bounds = host.getBoundingClientRect()
-      const pointerX = event.clientX - bounds.left
-      const pointerY = event.clientY - bounds.top
-      const dx = pointerX - interaction.startPointer.x
-      const dy = pointerY - interaction.startPointer.y
-
-      if (interaction.type === 'move') {
-        updateItem(interaction.id, {
-          x: clamp(interaction.startItem.x + dx, 0, stageSize.width - interaction.startItem.width),
-          y: clamp(interaction.startItem.y + dy, 0, stageHeight - interaction.startItem.height),
-        })
-        return
-      }
-
-      const next = { ...interaction.startItem }
-
-      if (interaction.handle.includes('right')) {
-        next.width = Math.max(MIN_ITEM_SIZE, interaction.startItem.width + dx)
-      }
-
-      if (interaction.handle.includes('bottom')) {
-        next.height = Math.max(MIN_ITEM_SIZE, interaction.startItem.height + dy)
-      }
-
-      if (interaction.handle.includes('left')) {
-        const width = Math.max(MIN_ITEM_SIZE, interaction.startItem.width - dx)
-        next.x = interaction.startItem.x + (interaction.startItem.width - width)
-        next.width = width
-      }
-
-      if (interaction.handle.includes('top')) {
-        const height = Math.max(MIN_ITEM_SIZE, interaction.startItem.height - dy)
-        next.y = interaction.startItem.y + (interaction.startItem.height - height)
-        next.height = height
-      }
-
-      next.x = clamp(next.x, 0, Math.max(0, stageSize.width - next.width))
-      next.y = clamp(next.y, 0, Math.max(0, stageHeight - next.height))
-
-      updateItem(interaction.id, next)
-      setMessage('Picture resized.')
-    }
-
-    const onPointerUp = () => {
-      if (interactionRef.current) {
-        interactionRef.current = null
-      }
-    }
-
-    window.addEventListener('pointermove', onPointerMove)
-    window.addEventListener('pointerup', onPointerUp)
-    window.addEventListener('pointercancel', onPointerUp)
-
-    return () => {
-      window.removeEventListener('pointermove', onPointerMove)
-      window.removeEventListener('pointerup', onPointerUp)
-      window.removeEventListener('pointercancel', onPointerUp)
-    }
-  }, [stageHeight, stageSize.width, updateItem])
-
   const handleSelect = useCallback(
     (id) => {
       setSelectedId(id)
@@ -266,36 +252,36 @@ function App() {
     [bringToFront],
   )
 
-  const startMove = useCallback(
-    (event, item) => {
-      event.preventDefault()
-      event.stopPropagation()
-      handleSelect(item.id)
-      interactionRef.current = {
-        type: 'move',
-        id: item.id,
-        startPointer: { x: event.clientX - stageHostRef.current.getBoundingClientRect().left, y: event.clientY - stageHostRef.current.getBoundingClientRect().top },
-        startItem: { ...item },
-      }
-      setMessage('Picture moved.')
-    },
-    [handleSelect],
-  )
+  const handleCanvasMouseDown = useCallback((event) => {
+    if (event.target === event.target.getStage()) {
+      setSelectedId(null)
+    }
+  }, [])
 
-  const startResize = useCallback(
-    (event, item, handle) => {
-      event.preventDefault()
-      event.stopPropagation()
-      handleSelect(item.id)
-      interactionRef.current = {
-        type: 'resize',
-        id: item.id,
-        handle,
-        startPointer: { x: event.clientX - stageHostRef.current.getBoundingClientRect().left, y: event.clientY - stageHostRef.current.getBoundingClientRect().top },
-        startItem: { ...item },
+  const handleTransformEnd = useCallback(
+    (id) => {
+      const node = nodeRefs.current[id]
+      if (!node) {
+        return
       }
+
+      const scaleX = node.scaleX()
+      const scaleY = node.scaleY()
+      const nextWidth = Math.max(80, Math.round(node.width() * scaleX))
+      const nextHeight = Math.max(80, Math.round(node.height() * scaleY))
+
+      node.scaleX(1)
+      node.scaleY(1)
+
+      updateItem(id, {
+        x: node.x(),
+        y: node.y(),
+        width: nextWidth,
+        height: nextHeight,
+      })
+      setMessage('Picture resized.')
     },
-    [handleSelect],
+    [updateItem],
   )
 
   const loadFiles = useCallback(
@@ -372,38 +358,29 @@ function App() {
     event.dataTransfer.effectAllowed = 'copy'
   }, [])
 
-  const handleUpload = useCallback(
-    async (event) => {
-      const files = Array.from(event.target.files || [])
-      if (!files.length) {
-        return
-      }
+  const handleDragOver = useCallback((event) => {
+    event.preventDefault()
+  }, [])
 
-      await loadFiles(files, {
-        x: 120,
-        y: 120,
-      })
+  const handleUpload = useCallback(async (event) => {
+    const files = Array.from(event.target.files || [])
+    if (!files.length) {
+      return
+    }
 
-      event.target.value = ''
-    },
-    [loadFiles],
-  )
+    await loadFiles(files, {
+      x: 120,
+      y: 120,
+    })
+
+    event.target.value = ''
+  }, [loadFiles])
 
   const clearCanvas = useCallback(() => {
     setItems([])
     setSelectedId(null)
     setMessage('Canvas cleared.')
   }, [])
-
-  const renderHandle = (item, handle, positionStyle) => (
-    <button
-      type="button"
-      className={`resize-handle ${handle}`}
-      style={positionStyle}
-      onPointerDown={(event) => startResize(event, item, handle)}
-      aria-label={`Resize ${handle}`}
-    />
-  )
 
   return (
     <main className="editor-shell">
@@ -474,59 +451,90 @@ function App() {
           ref={stageHostRef}
           className={`canvas-shell ${isDropActive ? 'is-dropping' : ''}`}
           onDrop={handleDrop}
-          onDragOver={(event) => event.preventDefault()}
+          onDragOver={handleDragOver}
           onDragEnter={() => setIsDropActive(true)}
           onDragLeave={() => setIsDropActive(false)}
-          onPointerDown={() => setSelectedId(null)}
         >
-          <canvas ref={canvasRef} className="stage-canvas" aria-hidden="true" />
-          <div className="stage-overlay" style={{ width: stageSize.width, height: stageHeight }}>
-            <div className="stage-labels">
-              <p>Canvas</p>
-              <span>Select an image to resize it, or drag new pictures in from the sidebar.</span>
-            </div>
+          <Stage
+            ref={stageRef}
+            width={stageSize.width}
+            height={stageHeight}
+            onMouseDown={handleCanvasMouseDown}
+            onTouchStart={handleCanvasMouseDown}
+          >
+            <Layer>
+              <Rect width={stageSize.width} height={stageHeight} fill="#111827" />
+              {Array.from({ length: Math.ceil(stageSize.width / 80) + 1 }).map((_, index) => (
+                <Rect
+                  key={`grid-x-${index}`}
+                  x={index * 80}
+                  width={1}
+                  height={stageHeight}
+                  fill="rgba(255,255,255,0.04)"
+                  listening={false}
+                />
+              ))}
+              {Array.from({ length: Math.ceil(stageHeight / 80) + 1 }).map((_, index) => (
+                <Rect
+                  key={`grid-y-${index}`}
+                  y={index * 80}
+                  width={stageSize.width}
+                  height={1}
+                  fill="rgba(255,255,255,0.04)"
+                  listening={false}
+                />
+              ))}
 
-            {items.map((item) => {
-              const isSelected = item.id === selectedId
-              const image = setImageForId(item.id, item.src)
+              <Text
+                x={28}
+                y={24}
+                text="Canvas"
+                fontSize={22}
+                fontStyle="700"
+                fill="rgba(255,255,255,0.8)"
+                listening={false}
+              />
+              <Text
+                x={28}
+                y={54}
+                text="Select an image to resize it, or drag new pictures in from the sidebar."
+                fontSize={14}
+                fill="rgba(255,255,255,0.56)"
+                listening={false}
+              />
 
-              return (
-                <div
+              {items.map((item) => (
+                <PictureNode
                   key={item.id}
-                  className={`canvas-item ${isSelected ? 'is-selected' : ''}`}
-                  style={{
-                    left: item.x,
-                    top: item.y,
-                    width: item.width,
-                    height: item.height,
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="canvas-item-surface"
-                    onPointerDown={(event) => startMove(event, item)}
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      handleSelect(item.id)
-                    }}
-                    aria-label={`Move ${item.label}`}
-                  >
-                    <img src={image.src} alt={item.label} draggable="false" />
-                    <span className="canvas-item-title">{item.label}</span>
-                  </button>
+                  item={item}
+                  isSelected={item.id === selectedId}
+                  onSelect={handleSelect}
+                  onUpdate={updateItem}
+                  onTransformEnd={handleTransformEnd}
+                  registerNode={registerNode}
+                />
+              ))}
 
-                  {isSelected && (
-                    <>
-                      {renderHandle(item, 'top-left', { left: -6, top: -6 })}
-                      {renderHandle(item, 'top-right', { right: -6, top: -6 })}
-                      {renderHandle(item, 'bottom-left', { left: -6, bottom: -6 })}
-                      {renderHandle(item, 'bottom-right', { right: -6, bottom: -6 })}
-                    </>
-                  )}
-                </div>
-              )
-            })}
-          </div>
+              <Transformer
+                ref={transformerRef}
+                rotateEnabled={false}
+                keepRatio
+                enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+                anchorSize={12}
+                borderStroke="#f8fafc"
+                borderStrokeWidth={2}
+                anchorFill="#f8fafc"
+                anchorStroke="#1f2937"
+                anchorCornerRadius={2}
+                boundBoxFunc={(oldBox, newBox) => {
+                  if (newBox.width < 80 || newBox.height < 80) {
+                    return oldBox
+                  }
+                  return newBox
+                }}
+              />
+            </Layer>
+          </Stage>
         </div>
       </section>
     </main>

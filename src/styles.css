@@ -4,11 +4,14 @@
   color-scheme: dark;
   --bg: #050816;
   --panel: rgba(15, 23, 42, 0.82);
+  --panel-strong: rgba(17, 24, 39, 0.94);
   --panel-soft: rgba(255, 255, 255, 0.06);
   --text: #f8fafc;
   --muted: rgba(226, 232, 240, 0.7);
   --line: rgba(255, 255, 255, 0.08);
   --accent: #7c3aed;
+  --accent-2: #14b8a6;
+  --accent-3: #f97316;
   --shadow: 0 28px 80px rgba(0, 0, 0, 0.48);
 }
 
@@ -111,8 +114,7 @@ button {
 .instructions-card p,
 .palette-heading span,
 .status-line,
-.workspace-badge,
-.stage-labels span {
+.workspace-badge {
   color: var(--muted);
   line-height: 1.55;
 }
@@ -136,9 +138,7 @@ button {
 .button:hover,
 .button:focus-visible,
 .palette-tile:hover,
-.palette-tile:focus-visible,
-.resize-handle:hover,
-.resize-handle:focus-visible {
+.palette-tile:focus-visible {
   transform: translateY(-1px);
 }
 
@@ -253,10 +253,26 @@ button {
 .canvas-shell {
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  position: relative;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(124, 58, 237, 0.24), transparent 22%),
+    radial-gradient(circle at 85% 10%, rgba(20, 184, 166, 0.16), transparent 20%),
+    linear-gradient(180deg, #0b1220 0%, #08101d 100%);
   overflow: hidden;
   min-height: 560px;
-  background: #0b1220;
+  position: relative;
+}
+
+.canvas-shell::after {
+  content: 'Drop images here';
+  position: absolute;
+  inset: auto 24px 24px auto;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.85rem;
+  pointer-events: none;
 }
 
 .canvas-shell.is-dropping {
@@ -264,112 +280,8 @@ button {
   outline-offset: -2px;
 }
 
-.stage-canvas,
-.stage-overlay {
-  position: absolute;
-  inset: 0;
-}
-
-.stage-canvas {
-  width: 100%;
-  height: 100%;
+.canvas-shell canvas {
   display: block;
-}
-
-.stage-overlay {
-  pointer-events: none;
-}
-
-.stage-labels {
-  position: absolute;
-  top: 18px;
-  left: 20px;
-  z-index: 2;
-}
-
-.stage-labels p {
-  margin: 0;
-  font-family: 'Fraunces', Georgia, serif;
-  font-size: 1.5rem;
-  letter-spacing: -0.03em;
-  color: #fff;
-}
-
-.stage-labels span {
-  display: block;
-  max-width: 44ch;
-  margin-top: 6px;
-  font-size: 0.92rem;
-}
-
-.canvas-item {
-  position: absolute;
-  pointer-events: auto;
-}
-
-.canvas-item.is-selected {
-  z-index: 3;
-}
-
-.canvas-item-surface {
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: none;
-  border-radius: 24px;
-  overflow: hidden;
-  position: relative;
-  background: rgba(15, 23, 42, 0.2);
-  box-shadow: 0 24px 40px rgba(0, 0, 0, 0.32);
-  touch-action: none;
-}
-
-.canvas-item-surface img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  user-select: none;
-  pointer-events: none;
-}
-
-.canvas-item-title {
-  position: absolute;
-  left: 14px;
-  bottom: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.68);
-  color: #fff;
-  font-size: 0.82rem;
-  pointer-events: none;
-}
-
-.canvas-item.is-selected .canvas-item-surface {
-  outline: 2px solid rgba(255, 255, 255, 0.9);
-  outline-offset: -2px;
-}
-
-.resize-handle {
-  position: absolute;
-  width: 16px;
-  height: 16px;
-  border: 2px solid white;
-  border-radius: 999px;
-  background: #7c3aed;
-  pointer-events: auto;
-  z-index: 4;
-  touch-action: none;
-}
-
-.resize-handle.top-left,
-.resize-handle.bottom-right {
-  cursor: nwse-resize;
-}
-
-.resize-handle.top-right,
-.resize-handle.bottom-left {
-  cursor: nesw-resize;
 }
 
 @media (max-width: 1120px) {
@@ -407,7 +319,7 @@ button {
     min-height: 520px;
   }
 
-  .stage-labels p {
-    font-size: 1.25rem;
+  .canvas-shell::after {
+    content: 'Drag files or starter pictures';
   }
 }
