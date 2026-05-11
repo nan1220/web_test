@@ -3,6 +3,7 @@ import { Image as KonvaImage, Layer, Rect, Stage, Text, Transformer } from 'reac
 
 const MIN_STAGE_HEIGHT = 560
 const MAX_STAGE_HEIGHT = 840
+const CANVAS_RADIUS = 24
 
 function createId(prefix = 'item') {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -436,7 +437,12 @@ function App() {
           onDragEnter={() => setIsDropActive(true)}
           onDragLeave={() => setIsDropActive(false)}
         >
-          <svg className="canvas-border-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <svg
+            className="canvas-border-overlay"
+            viewBox={`0 0 ${stageSize.width} ${stageHeight}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
             <defs>
               <linearGradient id="canvas-border-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="#22d3ee" />
@@ -444,8 +450,26 @@ function App() {
                 <stop offset="100%" stopColor="#f97316" />
               </linearGradient>
             </defs>
-            <rect className="canvas-border-base" x="1.5" y="1.5" width="97" height="97" rx="5" pathLength="1000" />
-            <rect className="canvas-border-trail" x="1.5" y="1.5" width="97" height="97" rx="5" pathLength="1000" />
+            <rect
+              className="canvas-border-base"
+              x="1"
+              y="1"
+              width={Math.max(0, stageSize.width - 2)}
+              height={Math.max(0, stageHeight - 2)}
+              rx={CANVAS_RADIUS}
+              ry={CANVAS_RADIUS}
+              pathLength="1000"
+            />
+            <rect
+              className="canvas-border-trail"
+              x="1"
+              y="1"
+              width={Math.max(0, stageSize.width - 2)}
+              height={Math.max(0, stageHeight - 2)}
+              rx={CANVAS_RADIUS}
+              ry={CANVAS_RADIUS}
+              pathLength="1000"
+            />
           </svg>
 
           <Stage
