@@ -79,10 +79,18 @@ function PictureNode({ item, isSelected, onSelect, onUpdate, onTransformEnd, reg
   const [image, setImage] = useState(null)
 
   useEffect(() => {
-    registerNode(item.id, shapeRef.current)
+    const transformer = registerNode.current
+    const selectedNode = shapeRef.current
 
-    return () => registerNode(item.id, null)
-  }, [item.id, registerNode])
+    if (!transformer) {
+      return
+    }
+
+    if (isSelected && image && selectedNode) {
+      transformer.nodes([selectedNode])
+      transformer.getLayer()?.batchDraw()
+    }
+  }, [image, isSelected, registerNode])
 
   useEffect(() => {
     let isActive = true
@@ -120,7 +128,7 @@ function PictureNode({ item, isSelected, onSelect, onUpdate, onTransformEnd, reg
             })
           }}
           onTransformStart={() => onSelect(item.id)}
-          onTransformEnd={() => onTransformEnd(item.id)}
+          onTransformEnd={() => onTransformEnd(item.id, shapeRef.current)}
           shadowColor="rgba(0, 0, 0, 0.3)"
           shadowBlur={20}
           shadowOffset={{ x: 0, y: 12 }}
@@ -150,7 +158,6 @@ function App() {
   const stageRef = useRef(null)
   const transformerRef = useRef(null)
   const fileInputRef = useRef(null)
-  const nodeRefs = useRef({})
 
   const [stageSize, setStageSize] = useState({ width: 960, height: 640 })
   const [items, setItems] = useState(INITIAL_ITEMS)
@@ -179,31 +186,6 @@ function App() {
     resizeObserver.observe(host)
 
     return () => resizeObserver.disconnect()
-  }, [])
-
-  useEffect(() => {
-    const transformer = transformerRef.current
-    const selectedNode = nodeRefs.current[selectedId]
-
-    if (!transformer) {
-      return
-    }
-
-    if (selectedNode) {
-      transformer.nodes([selectedNode])
-      transformer.getLayer()?.batchDraw()
-    } else {
-      transformer.nodes([])
-      transformer.getLayer()?.batchDraw()
-    }
-  }, [items, selectedId])
-
-  const registerNode = useCallback((id, node) => {
-    if (node) {
-      nodeRefs.current[id] = node
-    } else {
-      delete nodeRefs.current[id]
-    }
   }, [])
 
   const bringToFront = useCallback((id) => {
@@ -259,8 +241,7 @@ function App() {
   }, [])
 
   const handleTransformEnd = useCallback(
-    (id) => {
-      const node = nodeRefs.current[id]
+    (id, node) => {
       if (!node) {
         return
       }
@@ -511,7 +492,7 @@ function App() {
                   onSelect={handleSelect}
                   onUpdate={updateItem}
                   onTransformEnd={handleTransformEnd}
-                  registerNode={registerNode}
+                  registerNode={transformerRef}
                 />
               ))}
 
