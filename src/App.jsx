@@ -436,6 +436,18 @@ function App() {
           onDragEnter={() => setIsDropActive(true)}
           onDragLeave={() => setIsDropActive(false)}
         >
+          <svg className="canvas-border-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="canvas-border-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stopColor="#22d3ee" />
+                <stop offset="50%" stopColor="#60a5fa" />
+                <stop offset="100%" stopColor="#f97316" />
+              </linearGradient>
+            </defs>
+            <rect className="canvas-border-base" x="1.5" y="1.5" width="97" height="97" rx="5" pathLength="1000" />
+            <rect className="canvas-border-trail" x="1.5" y="1.5" width="97" height="97" rx="5" pathLength="1000" />
+          </svg>
+
           <Stage
             ref={stageRef}
             width={stageSize.width}

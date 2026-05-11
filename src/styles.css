@@ -252,7 +252,7 @@ button {
 
 .canvas-shell {
   border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid transparent;
   background:
     radial-gradient(circle at 20% 15%, rgba(124, 58, 237, 0.24), transparent 22%),
     radial-gradient(circle at 85% 10%, rgba(20, 184, 166, 0.16), transparent 20%),
@@ -260,6 +260,34 @@ button {
   overflow: hidden;
   min-height: 560px;
   position: relative;
+}
+
+.canvas-border-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.canvas-border-base,
+.canvas-border-trail {
+  fill: none;
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-border-base {
+  stroke: rgba(255, 255, 255, 0.14);
+}
+
+.canvas-border-trail {
+  stroke: url(#canvas-border-gradient);
+  stroke-linecap: round;
+  stroke-dasharray: 180 820;
+  stroke-dashoffset: 0;
+  animation: canvas-border-travel 2.6s linear infinite;
 }
 
 .canvas-shell::after {
@@ -275,13 +303,32 @@ button {
   pointer-events: none;
 }
 
+.canvas-shell > .konvajs-content {
+  position: relative;
+  z-index: 1;
+}
+
+.canvas-shell::after {
+  z-index: 3;
+}
+
 .canvas-shell.is-dropping {
   outline: 2px solid rgba(124, 58, 237, 0.72);
   outline-offset: -2px;
 }
 
+.canvas-shell.is-dropping .canvas-border-trail {
+  animation-duration: 1.3s;
+}
+
 .canvas-shell canvas {
   display: block;
+}
+
+@keyframes canvas-border-travel {
+  to {
+    stroke-dashoffset: -1000;
+  }
 }
 
 @media (max-width: 1120px) {
